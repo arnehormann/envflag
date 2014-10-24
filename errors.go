@@ -1,5 +1,10 @@
 package envflag
 
+import (
+	"fmt"
+	"strings"
+)
+
 type errors struct {
 	errs []error
 }
