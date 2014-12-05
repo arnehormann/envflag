@@ -2,40 +2,20 @@ package envflag
 
 import "fmt"
 
-type Errors struct {
-	errs []error
-}
+type errslice []error
 
-func (es *Errors) add(err error) {
-	if err == nil {
-		return
-	}
-	es.errs = append(es.errs, err)
-}
-
-func (es Errors) Len() int {
-	return len(es.errs)
-}
-
-func (es Errors) Err(i int) error {
-	if i < 0 || i >= len(es.errs) {
-		return nil
-	}
-	return es.errs[i]
-}
-
-func (es Errors) String() string {
-	switch len(es.errs) {
+func (es errslice) String() string {
+	switch len(es) {
 	case 0:
 		return "<no error>"
 	case 1:
-		return es.errs[0].Error()
+		return es[0].Error()
 	}
-	return fmt.Sprintf("%#v", es.errs)
+	return fmt.Sprintf("%#v", es)
 }
 
-func (es Errors) Error() error {
-	if len(es.errs) == 0 {
+func (es errslice) Join() error {
+	if len(es) == 0 {
 		return nil
 	}
 	return fmt.Errorf(es.String())

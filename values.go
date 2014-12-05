@@ -7,19 +7,21 @@ import (
 	"time"
 )
 
-// Value is a parameter that can be converted to and from string.
-//
-// It matches flag.Value.
+// A Value can be converted to and from string.
 type Value interface {
 	String() string
 	Set(string) error
 }
 
-// ValueOf provides a Value for a pointer.
+// ValueOf provides a value for data referenced by ptr.
 //
-// Unless the pointer ptr or its destination implement Value,
-// ptr must point to an int or uint type,
-// bool, byte, float32, float64, string or time.Duration.
+// Unless ptr or its memory destination implement Value,
+// ptr must point to an int or uint type (including byte and rune),
+// bool, float32, float64, time.Duration or string.
+
+// Values for these types will implement flag.Getter.
+// When calling Set on these Values, the value will only be set if parsing
+// with functions from strconv does not cause an error.
 func ValueOf(ptr interface{}) (Value, error) {
 	if ptr == nil {
 		return nil, errors.New("ptr is nil")
@@ -78,7 +80,9 @@ type boolValue bool
 
 func (p *boolValue) Set(s string) error {
 	v, err := strconv.ParseBool(s)
-	*p = boolValue(v)
+	if err == nil {
+		*p = boolValue(v)
+	}
 	return err
 }
 func (p *boolValue) Get() interface{} { return *(*bool)(p) }
@@ -94,21 +98,13 @@ func (p *stringValue) Set(s string) error {
 func (p *stringValue) Get() interface{} { return p.String() }
 func (p *stringValue) String() string   { return *(*string)(p) }
 
-type byteValue byte
-
-func (p *byteValue) Set(s string) error {
-	v, err := strconv.ParseUint(s, 0, 8)
-	*p = byteValue(v)
-	return err
-}
-func (p *byteValue) Get() interface{} { return byte(*p) }
-func (p *byteValue) String() string   { return strconv.FormatUint(uint64(*p), 10) }
-
 type uintValue uint
 
 func (p *uintValue) Set(s string) error {
 	v, err := strconv.ParseUint(s, 0, 0)
-	*p = uintValue(v)
+	if err == nil {
+		*p = uintValue(v)
+	}
 	return err
 }
 func (p *uintValue) Get() interface{} { return uint(*p) }
@@ -118,7 +114,9 @@ type uint8Value uint8
 
 func (p *uint8Value) Set(s string) error {
 	v, err := strconv.ParseUint(s, 0, 8)
-	*p = uint8Value(v)
+	if err == nil {
+		*p = uint8Value(v)
+	}
 	return err
 }
 func (p *uint8Value) Get() interface{} { return uint8(*p) }
@@ -128,7 +126,9 @@ type uint16Value uint16
 
 func (p *uint16Value) Set(s string) error {
 	v, err := strconv.ParseUint(s, 0, 16)
-	*p = uint16Value(v)
+	if err == nil {
+		*p = uint16Value(v)
+	}
 	return err
 }
 func (p *uint16Value) Get() interface{} { return uint16(*p) }
@@ -138,7 +138,9 @@ type uint32Value uint32
 
 func (p *uint32Value) Set(s string) error {
 	v, err := strconv.ParseUint(s, 0, 32)
-	*p = uint32Value(v)
+	if err == nil {
+		*p = uint32Value(v)
+	}
 	return err
 }
 func (p *uint32Value) Get() interface{} { return uint32(*p) }
@@ -148,7 +150,9 @@ type uint64Value uint64
 
 func (p *uint64Value) Set(s string) error {
 	v, err := strconv.ParseUint(s, 0, 64)
-	*p = uint64Value(v)
+	if err == nil {
+		*p = uint64Value(v)
+	}
 	return err
 }
 func (p *uint64Value) Get() interface{} { return uint64(*p) }
@@ -158,7 +162,9 @@ type intValue int
 
 func (p *intValue) Set(s string) error {
 	v, err := strconv.ParseInt(s, 0, 0)
-	*p = intValue(v)
+	if err == nil {
+		*p = intValue(v)
+	}
 	return err
 }
 func (p *intValue) Get() interface{} { return int(*p) }
@@ -168,7 +174,9 @@ type int8Value int8
 
 func (p *int8Value) Set(s string) error {
 	v, err := strconv.ParseInt(s, 0, 8)
-	*p = int8Value(v)
+	if err == nil {
+		*p = int8Value(v)
+	}
 	return err
 }
 func (p *int8Value) Get() interface{} { return int8(*p) }
@@ -178,7 +186,9 @@ type int16Value int16
 
 func (p *int16Value) Set(s string) error {
 	v, err := strconv.ParseInt(s, 0, 16)
-	*p = int16Value(v)
+	if err == nil {
+		*p = int16Value(v)
+	}
 	return err
 }
 func (p *int16Value) Get() interface{} { return int16(*p) }
@@ -188,7 +198,9 @@ type int32Value int32
 
 func (p *int32Value) Set(s string) error {
 	v, err := strconv.ParseInt(s, 0, 32)
-	*p = int32Value(v)
+	if err == nil {
+		*p = int32Value(v)
+	}
 	return err
 }
 func (p *int32Value) Get() interface{} { return int32(*p) }
@@ -198,7 +210,9 @@ type int64Value int64
 
 func (p *int64Value) Set(s string) error {
 	v, err := strconv.ParseInt(s, 0, 64)
-	*p = int64Value(v)
+	if err == nil {
+		*p = int64Value(v)
+	}
 	return err
 }
 func (p *int64Value) Get() interface{} { return int64(*p) }
@@ -208,7 +222,9 @@ type float32Value float32
 
 func (p *float32Value) Set(s string) error {
 	v, err := strconv.ParseFloat(s, 32)
-	*p = float32Value(v)
+	if err == nil {
+		*p = float32Value(v)
+	}
 	return err
 }
 func (p *float32Value) Get() interface{} { return float32(*p) }
@@ -218,7 +234,9 @@ type float64Value float64
 
 func (p *float64Value) Set(s string) error {
 	v, err := strconv.ParseFloat(s, 64)
-	*p = float64Value(v)
+	if err == nil {
+		*p = float64Value(v)
+	}
 	return err
 }
 func (p *float64Value) Get() interface{} { return float64(*p) }
@@ -228,8 +246,10 @@ type durationValue time.Duration
 
 func (p *durationValue) Set(s string) error {
 	v, err := time.ParseDuration(s)
-	*p = durationValue(v)
+	if err == nil {
+		*p = durationValue(v)
+	}
 	return err
 }
 func (p *durationValue) Get() interface{} { return time.Duration(*p) }
-func (p *durationValue) String() string   { return p.String() }
+func (p *durationValue) String() string   { return (*(*time.Duration)(p)).String() }

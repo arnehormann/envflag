@@ -1,8 +1,8 @@
 package envflag
 
 import (
-	"math/big"
 	"testing"
+	"time"
 )
 
 func TestValueOfErrors(t *testing.T) {
@@ -25,87 +25,63 @@ func TestValueOfErrors(t *testing.T) {
 	}
 }
 
-func getIntBounds(max string, signed bool) (lowout, lowin, highin, highout string, ok bool) {
-	// use math/big to also generate outer bounds of int64 / uint64
-	m1 := big.NewInt(-1)
-	p1 := big.NewInt(1)
-	tmp := big.NewInt(0)
-	highin = max
-	lowin = "0"
-	if signed {
-		tmp, ok = tmp.SetString("-"+highin, 10)
-		if !ok {
-			return
-		}
-		tmp = tmp.Add(tmp, m1)
-		lowin = tmp.String()
-	}
-	lowout = tmp.Add(tmp, m1).String()
-	tmp, ok = tmp.SetString(highin, 10)
-	if !ok {
-		return
-	}
-	highout = tmp.Add(tmp, p1).String()
-	return
-}
-
 func TestValueOfIntBounds(t *testing.T) {
-	// set variables to upper bound
+	type inttest struct {
+		ptr     interface{}
+		lowin   string
+		highin  string
+		lowout  string
+		highout string
+	}
 	var (
-		b   byte   = ^byte(0)
-		u   uint   = ^uint(0)
-		u8  uint8  = ^uint8(0)
-		u16 uint16 = ^uint16(0)
-		u32 uint32 = ^uint32(0)
-		u64 uint64 = ^uint64(0)
-		i   int    = int(u >> 1)
-		i8  int8   = int8(u8 >> 1)
-		i16 int16  = int16(u16 >> 1)
-		i32 int32  = int32(u32 >> 1)
-		i64 int64  = int64(u64 >> 1)
+		u   uint
+		u8  uint8 // also byte
+		u16 uint16
+		u32 uint32
+		u64 uint64
+		i   int
+		i8  int8
+		i16 int16
+		i32 int32 // also rune
+		i64 int64
 	)
-	for _, ptr := range []interface{}{
-		&b,
-		&u, &u8, &u16, &u32, &u64,
-		&i, &i8, &i16, &i32, &i64,
-	} {
+	tests := []inttest{
+		{&u, "0", "18446744073709551615", "-1", "18446744073709551616"},
+		{&u8, "0", "255", "-1", "256"},
+		{&u16, "0", "65535", "-1", "65536"},
+		{&u32, "0", "4294967295", "-1", "4294967296"},
+		{&u64, "0", "18446744073709551615", "-1", "18446744073709551616"},
+		{&i, "-9223372036854775808", "9223372036854775807", "-9223372036854775809", "9223372036854775808"},
+		{&i8, "-128", "127", "-129", "128"},
+		{&i16, "-32768", "32767", "-32769", "32768"},
+		{&i32, "-2147483648", "2147483647", "-2147483649", "2147483648"},
+		{&i64, "-9223372036854775808", "9223372036854775807", "-9223372036854775809", "9223372036854775808"},
+	}
+	for _, test := range tests {
+		ptr := test.ptr
 		v, err := ValueOf(ptr)
 		if err != nil {
-			t.Errorf("ValueOf(%T) must not cause an error: %s", ptr, err)
+			t.Fatalf("ValueOf(%T) must not cause an error: %s", ptr, err)
 		}
-		// use the starting value as maximum, get strings in and out of bounds
-		signed := false
-		switch ptr.(type) {
-		case *int, *int8, *int16, *int32, *int64:
-			signed = true
-		}
-		lo, li, hi, ho, ok := getIntBounds(v.String(), signed)
-		if !ok {
-			t.Errorf("could not convert bounds")
-		}
-
-		// DEBUG for checking boundaries per type:
-		// fmt.Printf("%T:\n\t%s\n\t%s\n\t%s\n\t%s\n", ptr, lo, li, hi, ho)
-
 		// check setting Value to values near boundaries
-		for _, valid := range []string{li, hi} {
+		for _, valid := range []string{test.lowin, test.highin} {
 			err = v.Set(valid)
 			if err != nil {
-				t.Errorf("could not set %T to valid %s", ptr, valid)
+				t.Errorf("could not set %T (%s) to valid %s", ptr, v, valid)
 			}
 			str := v.String()
 			if str != valid {
 				t.Errorf("%T: expected %s, got %s", ptr, valid, str)
 			}
 		}
-		for _, invalid := range []string{lo, ho} {
+		for _, invalid := range []string{test.lowout, test.highout} {
 			before := v.String()
 			err = v.Set(invalid)
 			if err == nil {
 				t.Errorf("could set %T to invalid %s", ptr, invalid)
 			}
 			str := v.String()
-			if str == before {
+			if str != before {
 				t.Errorf("%T: expected %s, got %s", ptr, before, str)
 			}
 		}
@@ -132,4 +108,115 @@ func (p noValue) Set(s string) error { return nil }
 func (p noValue) Get() interface{}   { return nil }
 func (p noValue) String() string     { return "" }
 
-// TODO missing float32, float64, bool, string, time.Duration
+func TestValueOfFloats(t *testing.T) {
+	// For detailed tests, see http://golang.org/src/pkg/strconv/atof_test.go
+	// This only checks boundaries and special values
+	type floattest struct {
+		val  string
+		errs bool
+	}
+	var (
+		f32 float32
+		f64 float64
+	)
+	for ptr, tests := range map[interface{}][]floattest{
+		&f32: {
+			{"3.4028235e+38", false},
+			{"-3.4028235e+38", false},
+			{"3.4028236e+38", true},
+			{"-3.4028236e+38", true},
+			{"+Inf", false},
+			{"-Inf", false},
+			{"NaN", false},
+		},
+		&f64: {
+			{"1.7976931348623157e+308", false},
+			{"-1.7976931348623157e+308", false},
+			{"1.797693134862315808e+308", true},
+			{"-1.797693134862315808e+308", true},
+			{"+Inf", false},
+			{"-Inf", false},
+			{"NaN", false},
+		},
+	} {
+		v, err := ValueOf(ptr)
+		if err != nil {
+			t.Fatalf("ValueOf(%T) must not cause an error: %s", ptr, err)
+		}
+		for _, test := range tests {
+			before := v.String()
+			err = v.Set(test.val)
+			if test.errs {
+				if err == nil {
+					t.Errorf("could set %T (%s, expected %s) to invalid %s", ptr, v, before, test.val)
+				}
+			} else {
+				if err != nil || v.String() != test.val {
+					t.Errorf("could not set %T (%s) to valid %s", ptr, v, test.val)
+				}
+			}
+		}
+	}
+}
+
+func TestValueOfBool(t *testing.T) {
+	// For detailed tests, see http://golang.org/src/pkg/strconv/atob_test.go
+	b := true
+	var ptr interface{} = &b
+	v, err := ValueOf(ptr)
+	if err != nil {
+		t.Fatalf("ValueOf(%T) must not cause an error: %s", ptr, err)
+	}
+	expected := "true"
+	str := v.String()
+	if str != expected {
+		t.Errorf("%T: expected %s, got %s", ptr, expected, str)
+	}
+	expected = "false"
+	err = v.Set(expected)
+	str = v.String()
+	if str != expected {
+		t.Errorf("%T: expected %s, got %s", ptr, expected, str)
+	}
+}
+
+func TestValueOfString(t *testing.T) {
+	s := "abc"
+	var ptr interface{} = &s
+	v, err := ValueOf(ptr)
+	if err != nil {
+		t.Fatalf("ValueOf(%T) must not cause an error: %s", ptr, err)
+	}
+	expected := s
+	str := v.String()
+	if str != expected {
+		t.Errorf("%T: expected %s, got %s", ptr, expected, str)
+	}
+	expected = "Hello, 世界"
+	err = v.Set(expected)
+	str = v.String()
+	if str != expected {
+		t.Errorf("%T: expected %s, got %s", ptr, expected, str)
+	}
+}
+
+func TestValueOfDuration(t *testing.T) {
+	s := "1s"
+	d, _ := time.ParseDuration(s)
+	var ptr interface{} = &d
+	v, err := ValueOf(ptr)
+	if err != nil {
+		t.Fatalf("ValueOf(%T) must not cause an error: %s", ptr, err)
+	}
+	expected := s
+	str := v.String()
+	if str != expected {
+		t.Errorf("%T: expected %s, got %s", ptr, expected, str)
+	}
+	expected = "-3h2m1s"
+	err = v.Set(expected)
+	str = v.String()
+	if str != expected {
+		t.Errorf("%T: expected %s, got %s", ptr, expected, str)
+	}
+}
